@@ -1,0 +1,147 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <script src="/assets/epoly.js" type="text/javascript"></script>
+    <title>Waypoints in directions</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        float: center;
+        width: 700px;
+        height: 450px;
+      }
+    </style>
+  </head>
+  <body>
+    <div align="center">
+        <div id="map"></div><br/>
+        <div id="right-panel">
+            <div>
+                <b>Start:</b>
+                <input type="text" size="80" maxlength="200" id="start" value="Meralco, Philippines" /><br />
+                <b>End:</b>
+                <input type="text" size="80" maxlength="200" id="end" value="Rockwell Business Center, Philippines" /><br />
+                <br>
+                <input type="submit" id="submit">
+            </div>
+            <div id="directions-panel"></div>
+            <div id="step"></div>
+            <div id="distance"></div>
+        </div>
+    </div>
+    <script>
+        var step = 10; // metres
+        var tick = 100; // milliseconds
+        var poly;
+        var poly2;
+        var lastVertex = 0;
+        var eol;
+        var marker;
+        var k=0;
+        var stepnum=0;
+        var speed = "";   
+        var distanceLeft = 0;
+
+        var linePosts = [ 
+            [14.588702297231006, 121.0655164718628],
+            [14.588764594778809, 121.06632113456726],
+            [14.588826892308976, 121.06707215309142],
+            [14.588889189821526, 121.06787681579588],
+            [14.588961870230545, 121.06879949569701],
+            [14.589034550615558, 121.06965780258177],
+            [14.589096848069342, 121.07053756713866],
+            [14.589138379695404, 121.07131004333495]
+        ];
+
+      function initMap() {
+        var directionsService = new google.maps.DirectionsService;
+        var directionsDisplay = new google.maps.DirectionsRenderer;
+        var map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 15,
+            center: {lat: 14.590291, lng: 121.067517},
+            mapTypeId: google.maps.MapTypeId.ROADMAP,
+                mapTypeControl: true,
+                mapTypeControlOptions: {
+                    style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR
+                 },
+                navigationControl: true,
+                navigationControlOptions: {
+                    style: google.maps.NavigationControlStyle.SMALL
+                }
+        });
+        directionsDisplay.setMap(map);
+
+        document.getElementById('submit').addEventListener('click', function() {
+          calculateAndDisplayRoute(directionsService, directionsDisplay);
+        });
+      }
+
+      function animate(d, dirin) {
+        if (d>eol) {
+          document.getElementById("step").innerHTML = "<b>Trip completed<\/b>";
+          document.getElementById("distance").innerHTML =  "Meters Left: 0";
+          return;
+        }
+        var p = poly.GetPointAtDistance(d);
+        if (k++>=180/step) {
+          map.panTo(p);
+          k=0;
+        }
+        marker.setPoint(p);
+        distanceLeft = eol - (d.toFixed(2))
+        document.getElementById("distance").innerHTML =  "Meters Left: "+ distanceLeft.toFixed(0) + speed;
+        if (stepnum+1 < dirn.steps()) {
+          if (dirn.getStep(stepnum).getPolylineIndex() < poly.GetIndexAtDistance(d)) {
+            stepnum++;
+            var steptext = dirn.getRoute(0).getStep(stepnum).getDescriptionHtml();
+            var stepdist = dirn.getRoute(0).getStep(stepnum-1).getDistance().meters;
+            var steptime = dirn.getRoute(0).getStep(stepnum-1).getDuration().seconds;
+            var stepspeed = ((stepdist/steptime) * 3.6).toFixed(0);
+            step = stepspeed/2.5;
+            speed = "<br>Current speed: " + stepspeed +" kph";
+          }
+        } else {
+          if (dirn.getRoute(0).getStep(stepnum).getPolylineIndex() < poly.GetIndexAtDistance(d)) {
+            // document.getElementById("step").innerHTML = "<b>Next: Arrive at your destination<\/b>";
+          }
+        }
+        // updatePoly(d);
+        setTimeout("animate("+(d+step)+")", tick);
+      }
+
+      function calculateAndDisplayRoute(directionsService, directionsDisplay) {
+        directionsService.route({
+          origin: document.getElementById('start').value,
+          destination: document.getElementById('end').value,
+          travelMode: 'DRIVING'
+        }, function(response, status) {
+          if (status === 'OK') {
+            directionsDisplay.setDirections(response);
+            var route = response.routes[0];
+            var summaryPanel = document.getElementById('directions-panel');
+            summaryPanel.innerHTML = '';
+            // For each route, display summary information.
+            summaryPanel.innerHTML += route.legs[i].start_address + ' to ';
+            summaryPanel.innerHTML += route.legs[i].end_address + '<br>';
+            summaryPanel.innerHTML += "<b> Total Distance: </b>"+ route.legs[i].distance.text + '<br><br>';
+            eol=route.legs[0].distance.text;
+            setTimeout("animate(0,route.legs[0])",2000);  // Allow time for the initial map display
+          } else {
+            window.alert('Directions request failed due to ' + status);
+          }
+        });
+      }
+      
+    </script>
+    <script async defer
+     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCFsJ9A5Q7Ui-_RaEtVwT2C12CnrgHoKr0&callback=initMap">
+    </script>
+  </body>
+</html>

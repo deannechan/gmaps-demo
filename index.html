@@ -1,0 +1,168 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+    <title>Google Maps</title>
+    <script src="https://maps.google.com/maps?file=api&amp;v=2&amp;sensor=false&amp;key=YOURKEY" type="text/javascript"></script>
+    <script src="/assets/epoly.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  </head>
+  <body onunload="GUnload()">
+  <div align="center">
+    <div id="controls">
+      <br/>
+     <form onsubmit="start();return false" action="#">
+      <strong>Start: </strong><input type="text" size="80" maxlength="200" id="startpoint" value="Meralco Compound" /><br/>
+      <strong> End:  </strong><input type="text" size="80" maxlength="200" id="endpoint" value="Rockwell Business Center, Philippines" /><br />
+      <input type="submit" value="Start" class="btn btn-info"/>
+     </form>
+    </div>
+
+    <br/>
+    <div id="desc"></div>
+    <div id="map" style="width: 700px; height: 450px"></div>
+    <div id="step">&nbsp;</div>
+    <div id="totalDistance"></div>
+    <div id="distance"></div><br/><br/>
+</div>
+    <script type="text/javascript">
+    if (GBrowserIsCompatible()) {
+ 
+      var map = new GMap2(document.getElementById("map"));
+      map.addControl(new GMapTypeControl());
+      map.setCenter(new GLatLng(14.588702297231006, 121.0655164718628),15);
+      var dirn = new GDirections();
+      var step = 10; // metres
+      var tick = 100; // milliseconds
+      var poly;
+      var poly2;
+      var lastVertex = 0;
+      var eol;
+      var car = new GIcon();
+          car.image="/assets/caricon.png"
+          car.iconSize=new GSize(32,18);
+          car.iconAnchor=new GPoint(16,9);
+
+      var post = new GIcon();
+          post.image="/assets/posticon.png"
+          post.iconSize=new GSize(32,18);
+          post.iconAnchor=new GPoint(16,9);  
+      var marker;
+      var k=0;
+      var stepnum=0;
+      var speed = "";   
+      var distanceLeft = 0;
+      
+
+      function updatePoly(d) {
+        // Spawn a new polyline every 20 vertices, because updating a 100-vertex poly is too slow
+        if (poly2.getVertexCount() > 20) {
+          poly2=new GPolyline([poly.getVertex(lastVertex-1)]);
+          map.addOverlay(poly2)
+        }
+
+        if (poly.GetIndexAtDistance(d) < lastVertex+2) {
+           if (poly2.getVertexCount()>1) {
+             poly2.deleteVertex(poly2.getVertexCount()-1)
+           }
+           poly2.insertVertex(poly2.getVertexCount(),poly.GetPointAtDistance(d));
+        } else {
+          poly2.insertVertex(poly2.getVertexCount(),poly.getVertex(lastVertex++));
+        }
+      }
+
+      function animate(d) {
+        if (d>eol) {
+          document.getElementById("step").innerHTML = "<b>Trip completed<\/b>";
+          document.getElementById("distance").innerHTML =  "Meters Left: 0";
+          return;
+        }
+        var p = poly.GetPointAtDistance(d);
+        if (k++>=180/step) {
+          map.panTo(p);
+          k=0;
+        }
+        marker.setPoint(p);
+        distanceLeft = eol - (d.toFixed(2))
+        document.getElementById("distance").innerHTML =  "Meters Left: "+ distanceLeft.toFixed(0) + speed;
+        if (stepnum+1 < dirn.getRoute(0).getNumSteps()) {
+          if (dirn.getRoute(0).getStep(stepnum).getPolylineIndex() < poly.GetIndexAtDistance(d)) {
+            stepnum++;
+            var steptext = dirn.getRoute(0).getStep(stepnum).getDescriptionHtml();
+            // document.getElementById("step").innerHTML = "<b>Next:<\/b> "+steptext;
+            var stepdist = dirn.getRoute(0).getStep(stepnum-1).getDistance().meters;
+            var steptime = dirn.getRoute(0).getStep(stepnum-1).getDuration().seconds;
+            var stepspeed = ((stepdist/steptime) * 3.6).toFixed(0);
+            step = stepspeed/2.5;
+            speed = "<br>Current speed: " + stepspeed +" kph";
+          }
+        } else {
+          if (dirn.getRoute(0).getStep(stepnum).getPolylineIndex() < poly.GetIndexAtDistance(d)) {
+            // document.getElementById("step").innerHTML = "<b>Next: Arrive at your destination<\/b>";
+          }
+        }
+        // updatePoly(d);
+        setTimeout("animate("+(d+step)+")", tick);
+      }
+
+      GEvent.addListener(dirn,"load", function() {
+        var linePosts = [ 
+            [14.588702297231006, 121.0655164718628],
+            [14.588764594778809, 121.06632113456726],
+            [14.588826892308976, 121.06707215309142],
+            [14.588889189821526, 121.06787681579588],
+            [14.588961870230545, 121.06879949569701],
+            [14.589034550615558, 121.06965780258177],
+            [14.589096848069342, 121.07053756713866],
+            [14.589138379695404, 121.07131004333495]
+        ];
+        map = new GMap2(document.getElementById("map"));
+        // document.getElementById("controls").style.display="none";
+        document.getElementById("desc").innerHTML = "From " + document.getElementById("startpoint").value + " to " + document.getElementById("endpoint").value;
+        poly=dirn.getPolyline();
+        eol=poly.Distance();
+
+        map.setCenter(poly.getVertex(0),17);
+        map.addOverlay(new GMarker(poly.getVertex(0),G_START_ICON));
+        map.addOverlay(new GMarker(poly.getVertex(poly.getVertexCount()-1),G_END_ICON));
+        marker = new GMarker(poly.getVertex(0),{icon:car});
+        map.addOverlay(marker);
+        map.addOverlay(poly);
+
+        var steptext = dirn.getRoute(0).getStep(stepnum).getDescriptionHtml();
+        document.getElementById("totalDistance").innerHTML = "Total Distance: " + eol.toFixed(0) + " meters"
+
+        poly2 = new GPolyline([poly.getVertex(0)]);
+        map.addOverlay(poly2);
+        
+        //plot line for meralco lines
+        for(var i=0; i<linePosts.length; i++){
+          linePosts[i] = new GLatLng(linePosts[i][0], linePosts[i][1]);
+          map.addOverlay(new GMarker(linePosts[i], {icon:post}));
+        }
+        var poly3 = new GPolyline(linePosts, '#FF0000', 3, 0.5, { geodesic: true });
+        map.addOverlay(poly3);
+        
+        setTimeout("animate(0)",2000);  // Allow time for the initial map display
+      });
+
+      GEvent.addListener(dirn,"error", function() {
+        alert("Location(s) not recognised. Code: "+dirn.getStatus().code);
+      });
+
+      function start() {
+        var startpoint = document.getElementById("startpoint").value;
+        var endpoint = document.getElementById("endpoint").value;
+        dirn.loadFromWaypoints([startpoint,endpoint],{getPolyline:true,getSteps:true});
+      }
+
+    }
+ 
+    </script>
+  </body>
+
+</html>
+
+
+
+
